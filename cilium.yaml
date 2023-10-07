@@ -1,0 +1,67 @@
+package:
+  name: cilium
+  version: 1.14.2
+  epoch: 0
+  description: Cilium is a networking, observability, and security solution with an eBPF-based dataplane
+  copyright:
+    - license: Apache-2.0
+  dependencies:
+    runtime:
+      - iptables
+      - iproute2
+      - ipset
+      - bpftool
+      - kmod
+      # cilium does compilations at runtime on the node.
+      - clang
+      - llvm16
+      - cni-plugins
+
+environment:
+  contents:
+    packages:
+      - busybox
+      - build-base
+      - go
+      - git
+      - coreutils # for GNU install
+      - grep
+      - clang
+      - llvm16
+      - iptables # for cilium-iptables
+
+pipeline:
+  - uses: git-checkout
+    with:
+      repository: https://github.com/cilium/cilium
+      tag: v${{package.version}}
+
+  - runs: |
+      # Remove groupadd from Makefile: it's not doing anything useful in
+      # a package build anyway, and it's not available in busybox.
+      find . -name Makefile -exec sed -i '/groupadd/d' {} \;
+
+      DESTDIR=${{targets.destdir}} DISABLE_ENVOY_INSTALLATION=1 make build-container
+      DESTDIR=${{targets.destdir}} DISABLE_ENVOY_INSTALLATION=1 make install-container
+
+  - uses: strip
+
+subpackages:
+  - name: cilium-iptables
+    description: iptables compatibility package for cilium
+    dependencies:
+      runtime:
+        - iptables
+    pipeline:
+      - runs: |
+          # This script generates a wrapper based on the version
+          # of iptables provided by the build environment.
+          ./images/runtime/iptables-wrapper-installer.sh
+          mkdir -p ${{targets.subpkgdir}}/sbin
+          mv /sbin/iptables-wrapper ${{targets.subpkgdir}}/sbin/iptables-wrapper
+
+update:
+  enabled: true
+  github:
+    identifier: cilium/cilium
+    strip-prefix: v
