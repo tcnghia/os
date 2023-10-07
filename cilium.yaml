@@ -60,6 +60,17 @@ subpackages:
           mkdir -p ${{targets.subpkgdir}}/sbin
           mv /sbin/iptables-wrapper ${{targets.subpkgdir}}/sbin/iptables-wrapper
 
+  - name: cilium-operator-generics
+    description: Generic operator for cilium
+    dependencies:
+      runtime:
+        - gops
+    pipeline:
+      - runs: |
+          cd /home/build/operator
+          make cilium-operator-generic
+          DESTDIR=${{targets.subpkgdir}} make install-generic
+
 update:
   enabled: true
   github:
