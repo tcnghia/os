@@ -59,8 +59,9 @@ subpackages:
           ./images/runtime/iptables-wrapper-installer.sh
           mkdir -p ${{targets.subpkgdir}}/sbin
           mv /sbin/iptables-wrapper ${{targets.subpkgdir}}/sbin/iptables-wrapper
+      - uses: strip
 
-  - name: cilium-operator-generics
+  - name: cilium-operator-generic
     description: Generic operator for cilium
     dependencies:
       runtime:
@@ -70,6 +71,16 @@ subpackages:
           cd /home/build/operator
           make cilium-operator-generic
           DESTDIR=${{targets.subpkgdir}} make install-generic
+      - uses: strip
+
+  - name: hubble-relay
+    description: Hubble relay
+    pipeline:
+      - runs: |
+          cd /home/build/hubble-relay
+          make hubble-relay
+          DESTDIR=${{targets.subpkgdir}} make install
+      - uses: strip
 
 update:
   enabled: true
