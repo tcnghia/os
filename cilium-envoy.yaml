@@ -43,15 +43,17 @@ pipeline:
     with:
       repository: https://github.com/cilium/proxy
       commit: e198a2824d309024cb91fb6a984445e73033291d
+  - uses: patch
+    with:
+      patches: toolchains-paths.patch
 
   - runs: |
       cd /home/build/proxylib
       make
-      mkdir -p ${{package.dest_dir}}/usr/lib
-      cp -v libcilium.so ${{package.dest_dir}}/usr/lib/libcilium.so
+      mkdir -p ${{targets.destdir}}/usr/lib
+      cp -v libcilium.so ${{targets.destdir}}/usr/lib/libcilium.so
 
       cd /home/build
-      cp bazel_toolchains_BUILD bazel/toolchains/BUILD
 
       export JAVA_HOME=/usr/lib/jvm/java-11-openjdk
       mkdir -p .cache/bazel/_bazel_root
@@ -61,13 +63,16 @@ pipeline:
 
       ./bazel/setup_clang.sh /usr
 
-      mkdir -p ${{package.dest_dir}}/usr/bin
+      mkdir -p ${{targets.destdir}}/usr/bin
 
       bazel build --config=clang --fission=no \
+        --discard_analysis_cache \
+        --nokeep_state_after_build \
+        --notrack_incremental_state \
         --conlyopt="-Wno-strict-prototypes" \
         --verbose_failures -c opt //:cilium-envoy
 
-      cp -v bazel-bin/cilium-envoy ${{package.dest_dir}}/usr/bin/cilium-envoy
+      cp -v bazel-bin/cilium-envoy ${{targets.destdir}}/usr/bin/cilium-envoy
 
 
   - uses: strip
