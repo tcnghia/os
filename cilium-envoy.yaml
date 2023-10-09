@@ -1,0 +1,76 @@
+package:
+  name: cilium-envoy
+  # cilium/proxy is refered by the build in cilium/cilium using
+  # digest. the project itself does not have any tag nro release.
+  version: "v1.27.0-6b9ff340bc4058c9063b74aeeadd58fdc724c32e"
+  epoch: 0
+  description:  Envoy proxy for Cilium with minimal Envoy extensions and Cilium policy enforcement filters.
+  copyright:
+    - license: Apache-2.0
+
+environment:
+  contents:
+    packages:
+      - busybox
+      - ca-certificates-bundle
+      - wolfi-baselayout
+      - binutils
+      - build-base
+      - git
+      - bazel-6
+      - openjdk-11
+      - bash
+      - libtool
+      - cmake
+      - samurai
+      - python3-dev
+      - clang~15
+      - llvm15
+      - llvm15-dev
+      - llvm-lld-15
+      - llvm15-tools
+      - llvm15-cmake-default
+      - coreutils
+      - patch
+      - go
+      # We need to stick to gcc 12 for now, envoy doesn't build with gcc >= 13
+      - gcc-12-default
+      - libstdc++-12
+      - libstdc++-12-dev
+
+pipeline:
+  - uses: git-checkout
+    with:
+      repository: https://github.com/cilium/proxy
+      commit: e198a2824d309024cb91fb6a984445e73033291d
+
+  - runs: |
+      cd /home/build/proxylib
+      make
+      mkdir -p ${{package.dest_dir}}/usr/lib
+      cp -v libcilium.so ${{package.dest_dir}}/usr/lib/libcilium.so
+
+      cd /home/build
+      cp bazel_toolchains_BUILD bazel/toolchains/BUILD
+
+      export JAVA_HOME=/usr/lib/jvm/java-11-openjdk
+      mkdir -p .cache/bazel/_bazel_root
+
+      # The Python interpreter complains about being run as root, there's a flag to pass to disable that warning.
+      sed -i 's/envoy_dependencies_extra()/envoy_dependencies_extra(ignore_root_user_error=True)/g' WORKSPACE
+
+      ./bazel/setup_clang.sh /usr
+
+      mkdir -p ${{package.dest_dir}}/usr/bin
+
+      bazel build --config=clang --fission=no \
+        --conlyopt="-Wno-strict-prototypes" \
+        --verbose_failures -c opt //:cilium-envoy
+
+      cp -v bazel-bin/cilium-envoy ${{package.dest_dir}}/usr/bin/cilium-envoy
+
+
+  - uses: strip
+
+update:
+  enabled: false
